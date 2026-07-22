@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KSP Copilot — Crime Database Query</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #1c2733; --muted: #5c6b7a;
+    --line: #d3d9df; --accent: #1f5fa8; --amber: #b7791f; --amber-bg: #fdf6e7;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         color: var(--ink); background: var(--bg); font-size: 14px; }
+  .num { font-variant-numeric: tabular-nums; }
+  header { background: var(--ink); color: #fff; padding: 10px 18px; display: flex;
+           align-items: baseline; gap: 12px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .3px; }
+  header .sub { color: #9fb0c0; font-size: 12px; }
+  header .disclaimer { margin-left: auto; font-size: 11px; color: #cbb26a;
+           border: 1px solid #5a4a1e; padding: 2px 8px; }
+  .layout { display: flex; height: calc(100vh - 41px); }
+  .chat { width: 60%; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+  .result { width: 40%; display: flex; flex-direction: column; background: var(--panel); }
+  .col-head { padding: 8px 14px; font-size: 11px; text-transform: uppercase;
+              letter-spacing: .8px; color: var(--muted); border-bottom: 1px solid var(--line);
+              background: #eceef1; }
+  .messages { flex: 1; overflow-y: auto; padding: 14px; }
+  .msg { margin-bottom: 14px; }
+  .msg .who { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
+  .msg.user .bubble { background: #e7eef6; border: 1px solid #cdddec; padding: 8px 11px; }
+  .msg.bot .bubble { background: var(--panel); border: 1px solid var(--line); padding: 10px 12px; }
+  .msg.bot.refused .bubble { background: var(--amber-bg); border: 1px solid #e3c98a; border-left: 3px solid var(--amber); }
+  .bubble .kn { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); color: var(--muted); }
+  .cite { color: var(--accent); font-family: var(--mono); cursor: pointer; text-decoration: underline dotted; }
+  .chips { padding: 8px 14px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; background: #eceef1; }
+  .chip { font-size: 12px; padding: 4px 9px; background: #fff; border: 1px solid var(--line);
+          cursor: pointer; color: var(--ink); }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .inputbar { display: flex; border-top: 1px solid var(--line); }
+  .inputbar input { flex: 1; border: none; padding: 12px 14px; font-size: 14px; outline: none; }
+  .inputbar button { border: none; background: var(--accent); color: #fff; padding: 0 20px; cursor: pointer; font-size: 14px; }
+  .inputbar button:disabled { background: #9db4cd; cursor: default; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  th { position: sticky; top: 0; background: #eceef1; font-size: 11px; text-transform: uppercase;
+       letter-spacing: .5px; color: var(--muted); }
+  td.fir { font-family: var(--mono); color: var(--accent); cursor: pointer; }
+  tr.hl { background: #fff6d8; }
+  .result-body { flex: 1; overflow: auto; }
+  .empty { padding: 20px; color: var(--muted); }
+  .drawer { border-top: 2px solid var(--ink); background: #f8f9fa; }
+  .drawer summary { cursor: pointer; padding: 8px 14px; font-size: 12px; font-weight: 600;
+                    letter-spacing: .5px; text-transform: uppercase; color: var(--ink); user-select: none; }
+  .drawer .dbody { padding: 10px 14px; max-height: 240px; overflow: auto; }
+  .drawer pre { font-family: var(--mono); font-size: 12px; background: #fff; border: 1px solid var(--line);
+                padding: 10px; overflow-x: auto; white-space: pre; }
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 2px 12px; font-size: 12px; margin-bottom: 10px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-family: var(--mono); }
+  .suppressed { color: var(--amber); font-size: 12px; margin-top: 8px; }
+  .toggle { font-size: 12px; margin-left: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>KSP Copilot</h1>
+  <span class="sub">Conversational query over the KSP crime database · Track 1</span>
+  <span class="disclaimer">SYNTHETIC DATA — no real KSP records</span>
+</header>
+
+<div class="layout">
+  <section class="chat">
+    <div class="col-head">Query
+      <label class="toggle"><input type="checkbox" id="knToggle"> reply in Kannada</label>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="chips" id="chips"></div>
+    <div class="inputbar">
+      <input id="input" placeholder="Ask about FIR records — cases, counts, trends, a specific FIR…" autocomplete="off">
+      <button id="send">Ask</button>
+    </div>
+  </section>
+
+  <section class="result">
+    <div class="col-head">Records returned</div>
+    <div class="result-body" id="resultBody"><div class="empty">Run a query to see matching records.</div></div>
+    <details class="drawer" id="drawer">
+      <summary>Debug · trust drawer</summary>
+      <div class="dbody" id="debugBody"><div class="empty">Nothing executed yet.</div></div>
+    </details>
+  </section>
+</div>
+
+<script>
+const EXAMPLES = [
+  "Show me chain-snatching cases near Kengeri in the last six months.",
+  "How many vehicle theft FIRs are still open in Bengaluru South division?",
+  "Which stations saw the biggest increase in burglary this quarter compared to last?",
+  "ಕೆಂಗೇರಿಯಲ್ಲಿ ಕಳೆದ ತಿಂಗಳು ಎಷ್ಟು ಪ್ರಕರಣಗಳು ದಾಖಲಾಗಿವೆ?",
+  "Who was the investigating officer on FIR 0142/2026 at Kengeri station?",
+];
+const $ = s => document.querySelector(s);
+const messages = $("#messages"), resultBody = $("#resultBody"), debugBody = $("#debugBody");
+
+EXAMPLES.forEach(q => {
+  const c = document.createElement("div"); c.className = "chip"; c.textContent = q;
+  c.onclick = () => { $("#input").value = q; send(); };
+  $("#chips").appendChild(c);
+});
+
+function esc(s){ return String(s ?? "").replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+function linkCitations(text, citations){
+  let html = esc(text);
+  (citations || []).forEach(fir => {
+    const re = new RegExp(esc(fir).replace('/', '\\/'), 'g');
+    html = html.replace(re, `<span class="cite" data-fir="${esc(fir)}">${esc(fir)}</span>`);
+  });
+  return html;
+}
+
+function addUser(text){
+  const el = document.createElement("div"); el.className = "msg user";
+  el.innerHTML = `<div class="who">Officer</div><div class="bubble">${esc(text)}</div>`;
+  messages.appendChild(el); messages.scrollTop = messages.scrollHeight;
+}
+
+function addBot(data){
+  const el = document.createElement("div");
+  el.className = "msg bot" + (data.refused ? " refused" : "");
+  let kn = data.answer_kn ? `<div class="kn">${esc(data.answer_kn)}</div>` : "";
+  let sup = (data.suppressed && data.suppressed.length)
+    ? `<div class="suppressed">⚠ ${data.suppressed.length} sentence(s) suppressed by grounding check.</div>` : "";
+  el.innerHTML = `<div class="who">${data.refused ? "Copilot · refused" : "Copilot"}</div>
+    <div class="bubble">${linkCitations(data.answer, data.citations)}${kn}${sup}</div>`;
+  messages.appendChild(el); messages.scrollTop = messages.scrollHeight;
+  el.querySelectorAll(".cite").forEach(c => c.onclick = () => highlightRow(c.dataset.fir));
+}
+
+function renderResult(rows){
+  if(!rows || !rows.length){ resultBody.innerHTML = '<div class="empty">No matching records.</div>'; return; }
+  const cols = Object.keys(rows[0]);
+  let h = "<table><thead><tr>" + cols.map(c => `<th>${esc(c)}</th>`).join("") + "</tr></thead><tbody>";
+  rows.forEach(r => {
+    const fir = r.fir_number ? ` data-fir="${esc(r.fir_number)}"` : "";
+    h += "<tr" + fir + ">" + cols.map(c => {
+      const cls = c === "fir_number" ? ' class="fir num"' : (typeof r[c] === "number" ? ' class="num"' : "");
+      return `<td${cls}>${esc(r[c])}</td>`;
+    }).join("") + "</tr>";
+  });
+  resultBody.innerHTML = h + "</tbody></table>";
+  resultBody.querySelectorAll("td.fir").forEach(td =>
+    td.onclick = () => highlightRow(td.textContent));
+}
+
+function highlightRow(fir){
+  resultBody.querySelectorAll("tr").forEach(tr => tr.classList.toggle("hl", tr.dataset.fir === fir));
+  const tr = resultBody.querySelector(`tr[data-fir="${fir}"]`);
+  if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
+}
+
+function renderDebug(data){
+  const slots = JSON.stringify(data.resolved_slots || {}, null, 0);
+  const timing = Object.entries(data.timing_ms || {}).map(([k,v]) => `${k}=${v}ms`).join("  ") || "—";
+  debugBody.innerHTML = `
+    <div class="kv">
+      <span class="k">template_id</span><span class="v">${esc(data.template_id) || "null (refused)"}</span>
+      <span class="k">refused</span><span class="v">${data.refused}</span>
+      <span class="k">resolved_slots</span><span class="v">${esc(slots)}</span>
+      <span class="k">citations</span><span class="v">${esc((data.citations||[]).join(", ")) || "—"}</span>
+      <span class="k">suppressed</span><span class="v">${(data.suppressed||[]).length}</span>
+      <span class="k">timing</span><span class="v">${esc(timing)}</span>
+    </div>
+    <div class="k" style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:4px;">Executed SQL (parameterised)</div>
+    <pre>${esc(data.sql_executed || "— no SQL executed —")}</pre>`;
+}
+
+async function send(){
+  const text = $("#input").value.trim();
+  if(!text) return;
+  addUser(text); $("#input").value = "";
+  $("#send").disabled = true;
+  try{
+    const res = await fetch("/api/query", {
+      method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ text, session_id: "demo", reply_kn: $("#knToggle").checked })
+    });
+    const data = await res.json();
+    addBot(data); renderResult(data.rows); renderDebug(data);
+    $("#drawer").open = true;
+  }catch(e){
+    addBot({ answer: "Request failed: " + e.message, refused: false, citations: [] });
+  }finally{
+    $("#send").disabled = false; $("#input").focus();
+  }
+}
+$("#send").onclick = send;
+$("#input").addEventListener("keydown", e => { if(e.key === "Enter") send(); });
+</script>
+</body>
+</html>

@@ -90,6 +90,22 @@ def resolve_period(phrase: str, now: dt.date = DEMO_NOW) -> tuple[dt.date, dt.da
 
 # --- name resolution -------------------------------------------------------
 
+def _singularize(phrase: str) -> list[str]:
+    """Naive plural->singular candidates for the last word (thefts->theft, burglaries->burglary)."""
+    words = phrase.split()
+    if not words:
+        return []
+    last = words[-1]
+    cands = []
+    if last.endswith("ies"):
+        cands.append(last[:-3] + "y")
+    if last.endswith("es"):
+        cands.append(last[:-2])
+    if last.endswith("s") and len(last) > 3:
+        cands.append(last[:-1])
+    return [" ".join(words[:-1] + [c]).strip() for c in cands]
+
+
 def resolve_name(value: str, choices: list[str]) -> tuple[str, str | list[str]]:
     """Returns ('ok', canonical) | ('ambiguous', [candidates]) | ('none', [suggestions])."""
     for c in choices:
@@ -117,9 +133,17 @@ def validate(template: QueryTemplate, raw: dict, refs: dict) -> tuple[dict, None
     """Validate + normalise router slots into DB-ready params, or return a Refusal."""
     resolved: dict = {}
 
-    # crime type — fuzzy match against the taxonomy
+    # crime type — fuzzy match against the taxonomy, retrying a singular form
+    # so plain-language plurals ("burglaries", "thefts") still resolve.
     if "crime_type" in raw and raw["crime_type"]:
-        status_, val = resolve_name(str(raw["crime_type"]), refs["crime_labels"])
+        ct = str(raw["crime_type"])
+        status_, val = resolve_name(ct, refs["crime_labels"])
+        if status_ != "ok":
+            for singular in _singularize(ct):
+                s2, v2 = resolve_name(singular, refs["crime_labels"])
+                if s2 == "ok":
+                    status_, val = s2, v2
+                    break
         if status_ != "ok":
             hint = ", ".join(val) if val else "none of the known offence types"
             return None, Refusal(
@@ -197,13 +221,19 @@ def validate(template: QueryTemplate, raw: dict, refs: dict) -> tuple[dict, None
         return None
 
     needed = _needed_keys(template)
-    if "period_a_start" in needed:  # T3: two periods
+    if "period_a_start" in needed:  # T3: two periods, both genuinely required
         for pfx, ph in (("period_a_", "period_a"), ("period_b_", "period_b")):
             if (r := _set_period(pfx, ph)):
                 return None, r
     if "period_start" in needed:
         if (r := _set_period("period_", "period")):
             return None, r
+        # Single-period templates (T1/T6): if the user gave no time range,
+        # search the whole dataset rather than refusing. A natural question
+        # like "chain snatching cases in Indiranagar" should just work.
+        if "period_start" not in resolved:
+            resolved["period_start"] = DATA_FLOOR.isoformat()
+            resolved["period_end"] = DEMO_NOW.isoformat()
 
     # limit — clamp to 50
     if "limit" in needed:

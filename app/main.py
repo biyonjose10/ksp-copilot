@@ -60,10 +60,15 @@ def _handle_query(body: QueryIn) -> dict:
 
     tid = routed.get("template_id")
     if tid is None:
-        reason = routed.get("reason", "That question is outside what this system can answer.")
-        out = _refuse(f"I can't answer that from the crime database. {reason}",
-                      "This tool answers six shapes of question over FIR records; "
-                      "ask about cases, counts, trends, or a specific FIR.", timing_ms=timing)
+        # Keep the model's raw reasoning out of the answer — it's engineer-speak
+        # (template IDs, etc.). Show a plain message; stash the detail for the drawer.
+        out = _refuse(
+            "I couldn't match that to the crime records I can search.",
+            "Try naming a crime type and a place — for example "
+            "“burglary cases in Whitefield”, “how many thefts are open "
+            "in Bengaluru South”, or an FIR number like “FIR 0142/2026”.",
+            timing_ms=timing)
+        out["refusal_reason"] = routed.get("reason") or out["refusal_reason"]
         if want_kn:
             out["answer_kn"] = to_kannada(out["answer"])
         return out

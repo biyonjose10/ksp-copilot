@@ -16,28 +16,37 @@ from app.llm.client import complete
 def _system_prompt() -> str:
     lines = [
         "You route a natural-language question about a police crime database to ONE of the",
-        "query templates below, or to null if none fit.",
+        "query templates below. Pick the single best-fitting template.",
         f"\nToday's date is {DEMO_NOW.isoformat()}.",
         "\nTemplates:",
     ]
     for t in REGISTRY.values():
-        lines.append(
-            f"- {t.template_id}: {t.description}\n"
-            f"    required slots: {', '.join(t.required_slots)}\n"
-            f"    optional slots: {', '.join(t.optional_slots) or '(none)'}")
+        lines.append(f"- {t.template_id}: {t.description}\n"
+                     f"    slots it can use: {', '.join(t.required_slots + t.optional_slots)}")
     lines += [
+        "\nHow to choose:",
+        "- 'show / list / which cases' about a crime type or place -> T1.",
+        "- 'how many ... open / closed / pending' -> T2.",
+        "- 'biggest increase / decrease ... vs / compared to ...' -> T3.",
+        "- a specific FIR number -> T4.",
+        "- 'caseload / how many cases at <station>' -> T5.",
+        "- 'most common / top crimes' -> T6.",
         "\nSlot-filling rules:",
-        "- Return relative time expressions VERBATIM (e.g. \"last six months\", \"this quarter\").",
-        "  Do NOT compute dates. Use slot key 'period' for a single range;",
-        "  'period_a' and 'period_b' for period-over-period comparison templates.",
-        "- Expand elliptical periods to full phrases: \"this quarter compared to last\"",
-        "  -> period_a: \"this quarter\", period_b: \"last quarter\".",
-        "- crime_type, status, station, division, district, fir_number: copy the user's words.",
-        "- Only include slots you actually have evidence for. Omit the rest.",
+        "- Fill only the slots you can see in the question; omit the rest.",
+        "- Copy crime_type, status, station, division, district, fir_number from the user's words.",
+        "- Time periods: copy relative phrases VERBATIM (\"last six months\", \"this quarter\").",
+        "  Do NOT compute dates. Use 'period' for one range; 'period_a' and 'period_b' for",
+        "  comparisons. Expand ellipsis: \"this quarter compared to last\" ->",
+        "  period_a=\"this quarter\", period_b=\"last quarter\".",
+        "\nIMPORTANT — when to return null:",
+        "- A MISSING time period, area, or count is NEVER a reason to return null. The backend",
+        "  fills those in (missing dates default to all records). Just pick the template and",
+        "  leave the slot out. Do NOT refuse because a date range or place is absent.",
+        "- Return null ONLY when the question is not about crime records at all — e.g. weather,",
+        "  food, opinions, or predictions about a person ('is he likely to solve it?').",
         "\nRespond with JSON ONLY — no prose, no markdown fences. Schema:",
         '{"template_id": "<id or null>", "slots": {..}, "confidence": "high|medium|low"}',
-        'If nothing fits, respond: {"template_id": null, "reason": "<why>"}',
-        "Refusing (template_id=null) is a valid, expected answer, not a failure.",
+        'When the question is out of scope: {"template_id": null, "reason": "<short why>"}',
     ]
     return "\n".join(lines)
 

@@ -40,6 +40,15 @@ def _refuse(reason: str, suggestion: str | None = None, **extra) -> dict:
 
 @app.post("/api/query")
 def api_query(body: QueryIn) -> dict:
+    try:
+        return _handle_query(body)
+    except Exception as e:  # noqa: BLE001 — the demo path must never surface a raw 500
+        return _refuse(
+            "The system hit a temporary error and could not process that question. "
+            "Please try again.", error=str(e))
+
+
+def _handle_query(body: QueryIn) -> dict:
     timing: dict[str, int] = {}
     lang = "kn" if is_kannada(body.text) else "en"
     want_kn = lang == "kn" or body.reply_kn

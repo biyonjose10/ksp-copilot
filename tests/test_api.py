@@ -75,6 +75,17 @@ def test_bad_crime_type_refuses_before_sql(monkeypatch):
     assert d["sql_executed"] == ""               # refused at validation, no SQL ran
 
 
+def test_llm_failure_returns_refusal_not_500(monkeypatch):
+    def boom(q):
+        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    monkeypatch.setattr(main.router_llm, "route", boom)
+    r = client.post("/api/query", json={"text": "how many cases in Kengeri?"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["refused"] is True
+    assert "temporary error" in d["answer"]
+
+
 def test_health_and_schema():
     assert client.get("/api/health").json()["status"] == "ok"
     schema = client.get("/api/schema").json()

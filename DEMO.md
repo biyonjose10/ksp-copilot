@@ -5,7 +5,7 @@ The drawer is the trust argument; the answers are secondary to *showing the work
 
 Setup on the demo machine:
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env   # or GEMINI_API_KEY=AIza... (free tier)
 docker compose up --build      # wait for "Application startup complete"
 open http://localhost:8000
 ```

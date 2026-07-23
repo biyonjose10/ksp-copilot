@@ -30,6 +30,8 @@ def _system_prompt() -> str:
         "- Return relative time expressions VERBATIM (e.g. \"last six months\", \"this quarter\").",
         "  Do NOT compute dates. Use slot key 'period' for a single range;",
         "  'period_a' and 'period_b' for period-over-period comparison templates.",
+        "- Expand elliptical periods to full phrases: \"this quarter compared to last\"",
+        "  -> period_a: \"this quarter\", period_b: \"last quarter\".",
         "- crime_type, status, station, division, district, fir_number: copy the user's words.",
         "- Only include slots you actually have evidence for. Omit the rest.",
         "\nRespond with JSON ONLY — no prose, no markdown fences. Schema:",

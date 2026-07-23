@@ -13,3 +13,7 @@ DB_URL = os.environ.get("DATABASE_URL", "postgresql://ksp:ksp@localhost:5432/ksp
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+
+# Fallback provider for the prototype when no Anthropic key is available.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")

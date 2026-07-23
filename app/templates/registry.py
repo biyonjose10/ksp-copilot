@@ -146,7 +146,9 @@ T5 = QueryTemplate(
     template_id="T5_station_summary",
     description=(
         "Summarise the caseload at one station: counts by status and by crime type, "
-        "optionally within a date range. Use for 'what's the caseload / case mix at ... station'."
+        "optionally within a date range. Use for 'what's the caseload / case mix at ... station' "
+        "and for 'how many cases were registered at/in <station> <period>' when no specific "
+        "crime type or status is asked for."
     ),
     required_slots=("station",),
     optional_slots=("period_start", "period_end"),

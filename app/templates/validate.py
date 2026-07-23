@@ -138,7 +138,8 @@ def validate(template: QueryTemplate, raw: dict, refs: dict) -> tuple[dict, None
         resolved["status"] = s
 
     # hierarchy names — station / division / district
-    for field, key in (("station", "stations"), ("division", "divisions"), ("district", "districts")):
+    hierarchy = (("station", "stations"), ("division", "divisions"), ("district", "districts"))
+    for field, key in hierarchy:
         if field in raw and raw[field]:
             status_, val = resolve_name(str(raw[field]), refs[key])
             if status_ == "ambiguous":
@@ -146,9 +147,20 @@ def validate(template: QueryTemplate, raw: dict, refs: dict) -> tuple[dict, None
                     f"'{raw[field]}' matches more than one {field}. Which did you mean?",
                     suggestion=" / ".join(val), needs_clarification=True)
             if status_ == "none":
-                hint = ", ".join(val) if val else f"no known {field}"
-                return None, Refusal(f"'{raw[field]}' does not match a known {field}.",
-                                     suggestion=f"Did you mean: {hint}?")
+                # Router sometimes puts a name at the wrong hierarchy level
+                # (e.g. a station in the division slot) — try the other levels.
+                for alt_field, alt_key in hierarchy:
+                    if alt_field == field or alt_field in resolved:
+                        continue
+                    alt_status, alt_val = resolve_name(str(raw[field]), refs[alt_key])
+                    if alt_status == "ok":
+                        resolved[alt_field] = alt_val
+                        break
+                else:
+                    hint = ", ".join(val) if val else f"no known {field}"
+                    return None, Refusal(f"'{raw[field]}' does not match a known {field}.",
+                                         suggestion=f"Did you mean: {hint}?")
+                continue
             resolved[field] = val
 
     if "fir_number" in raw and raw["fir_number"]:
@@ -157,20 +169,26 @@ def validate(template: QueryTemplate, raw: dict, refs: dict) -> tuple[dict, None
     # periods — single, or A/B for period-over-period templates
     def _set_period(prefix: str, phrase_key: str) -> Refusal | None:
         start_k, end_k = f"{prefix}start", f"{prefix}end"
+        supplied = [raw.get(k) for k in (phrase_key, start_k, end_k) if raw.get(k)]
+        if not supplied:
+            return None  # period not supplied (may be optional for this template)
+        s = e = None
         if raw.get(start_k) and raw.get(end_k):
             try:
                 s = dt.date.fromisoformat(str(raw[start_k]))
                 e = dt.date.fromisoformat(str(raw[end_k]))
             except ValueError:
-                return Refusal(f"Could not read the dates for {phrase_key or prefix}.")
-        elif raw.get(phrase_key):
-            rng = resolve_period(str(raw[phrase_key]))
-            if not rng:
-                return Refusal(f"Could not interpret the time period '{raw[phrase_key]}'.",
+                s = None
+        if s is None:
+            # Router output varies: the phrase may arrive in the phrase slot or
+            # (partially) in start/end. Resolve the first value that parses.
+            for v in supplied:
+                if (rng := resolve_period(str(v))):
+                    s, e = rng
+                    break
+            else:
+                return Refusal(f"Could not interpret the time period '{supplied[0]}'.",
                                suggestion="Try 'last 6 months', 'this quarter', or explicit dates.")
-            s, e = rng
-        else:
-            return None  # period not supplied (may be optional for this template)
         if s > e:
             return Refusal("The start date is after the end date.")
         if s < DATA_FLOOR:

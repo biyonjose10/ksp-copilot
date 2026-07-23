@@ -108,11 +108,12 @@ Open the debug drawer on stage to show it.
 See [`DEMO.md`](DEMO.md) for the demo/rehearsal script and [`DEPLOY.md`](DEPLOY.md) for
 deployment (Zoho Catalyst + a Docker fallback).
 
-Requires Docker and an Anthropic API key.
+Requires Docker and one LLM API key — Anthropic (preferred) or Google Gemini
+(free-tier fallback). Put it in `.env` at the repo root:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...      # required for the LLM steps
-docker compose up --build                # starts Postgres, seeds, serves API+UI
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env   # or: GEMINI_API_KEY=AIza...
+docker compose up --build                    # starts Postgres, seeds, serves API+UI
 # open http://localhost:8000
 ```
 
@@ -146,6 +147,9 @@ Named honestly, because judges trust teams that name their own gaps.
 - **Frontend is a single zero-build page** served by FastAPI (chosen for clean-clone
   robustness over a build toolchain).
 - **Last-turn only** — no multi-turn conversational memory.
+- **Two LLM providers** — Anthropic Messages API is the primary target; the prototype can
+  run on Gemini's free tier via the same thin client (`app/llm/client.py`). The
+  architecture (templates, validation, grounding) is provider-independent by design.
 
 ## What we'd build next
 

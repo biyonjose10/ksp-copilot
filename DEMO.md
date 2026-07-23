@@ -83,6 +83,6 @@ Chip: **"Who was the investigating officer on FIR 0142/2026 at Kengeri station?"
 
 ### Recovery if something breaks live
 
-- API 500 / no answer → check `ANTHROPIC_API_KEY` is set in the shell running Compose.
+- Every question returns a "temporary error" card → the LLM is unreachable; check `ANTHROPIC_API_KEY` is set in the shell running Compose.
 - Empty results → re-seed: `docker compose restart api` (re-runs `db/seed.py`, deterministic).
 - Fall back to the pre-run screenshots for questions 1–4; **never skip the question-5 refusal** — it is the point.

@@ -99,6 +99,6 @@ URL. This is the configuration verified working during the build.
 
 - [ ] `GET /api/health` returns `{"status":"ok","db":"up"}` on the deployed URL
 - [ ] All five demo questions answer (see `DEMO.md`), and the question-5 refusal fires
-- [ ] `ANTHROPIC_API_KEY` is set in the deployed env (LLM steps 500 without it)
+- [ ] `ANTHROPIC_API_KEY` is set in the deployed env (without it every query returns a "temporary error" refusal card)
 - [ ] Opens on a phone over mobile data (Day-4 gate)
 - [ ] Debug drawer shows executed SQL — this is the trust argument, rehearse opening it

@@ -61,6 +61,24 @@
   .kv .v { font-family: var(--mono); }
   .suppressed { color: var(--amber); font-size: 12px; margin-top: 8px; }
   .toggle { font-size: 12px; margin-left: 6px; }
+
+  /* Phone layout: stack panels, swipeable chips, no iOS focus-zoom. */
+  @media (max-width: 768px) {
+    header { flex-wrap: wrap; gap: 4px 12px; padding: 8px 12px; }
+    header .sub { display: none; }
+    header .disclaimer { margin-left: 0; }
+    .layout { flex-direction: column; height: auto; min-height: 0;
+              position: fixed; inset: 0; top: 58px; }
+    .chat { width: 100%; flex: 1 1 55%; min-height: 0;
+            border-right: none; border-bottom: 2px solid var(--ink); }
+    .result { width: 100%; flex: 1 1 45%; min-height: 0; }
+    .chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .chip { white-space: nowrap; flex: 0 0 auto; }
+    .inputbar input { font-size: 16px; }   /* <16px triggers iOS auto-zoom */
+    .inputbar button { padding: 0 16px; }
+    .drawer .dbody { max-height: 160px; }
+    .kv { grid-template-columns: 96px 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -189,7 +207,8 @@ async function send(){
     });
     const data = await res.json();
     addBot(data); renderResult(data.rows); renderDebug(data);
-    $("#drawer").open = true;
+    // Auto-open the trust drawer on desktop only — on a phone it crowds out the results.
+    if (matchMedia("(min-width: 769px)").matches) $("#drawer").open = true;
   }catch(e){
     addBot({ answer: "Request failed: " + e.message, refused: false, citations: [] });
   }finally{

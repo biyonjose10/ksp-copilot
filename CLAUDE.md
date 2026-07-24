@@ -458,3 +458,22 @@ Rehearse these. They are asked every time.
 Authentication. Role-based access. Real-time ingestion. Predictive policing. Face recognition. Individual risk scoring. Mobile app. Multi-turn conversational memory beyond the last turn. Chart generation. PDF export.
 
 Any of these will consume a day and win nothing.
+
+---
+
+## 15. Current state & onboarding (updated 2026-07-24)
+
+Repo is **public**: https://github.com/banitsriram/ksp-copilot — anyone can read/fork; push access is by collaborator invite (Biyon, Andrea, Rayan).
+
+**Secrets live outside git.** `.env` and `app-config.json` are `.gitignore`d and were never committed. They are shared privately (team chat), never in the repo:
+- `GEMINI_API_KEY` — the build uses **Google Gemini** (`gemini-2.5-flash`), not the Anthropic API named in §5. Router/synthesis prompts are unchanged; only the client differs.
+- `DATABASE_URL` — points at a **Neon** serverless Postgres (the demo DB, seeded from `db/seed.py`). Local dev can use the docker-compose Postgres instead.
+
+**Local setup from a fresh clone:**
+```
+docker compose up                              # postgres + api
+docker compose exec api python db/seed.py      # deterministic synthetic data (~6k FIRs)
+# create .env + app-config.json from the values shared privately
+```
+
+**Deployment status:** Zoho Catalyst AppSail deploy is in progress (`server.py` + `catalyst.json` + local-only `app-config.json`); startup still being debugged against console logs. An ngrok static-domain tunnel over the local app is the standby demo URL.

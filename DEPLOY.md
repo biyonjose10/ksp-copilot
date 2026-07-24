@@ -102,3 +102,41 @@ URL. This is the configuration verified working during the build.
 - [ ] `ANTHROPIC_API_KEY` is set in the deployed env (without it every query returns a "temporary error" refusal card)
 - [ ] Opens on a phone over mobile data (Day-4 gate)
 - [ ] Debug drawer shows executed SQL — this is the trust argument, rehearse opening it
+
+---
+
+## Catalyst AppSail — gotchas found while deploying (2026-07-25)
+
+Deployed and verified working. The deployed URL is deliberately **not** recorded in this
+repo — the repo is public and the app has no authentication by design (CLAUDE.md §14).
+Get it from team chat.
+
+Three things the docs do not tell you, each of which fails as a bare
+`503 Execution failed. Please check the startup command or port.`
+The real error is only visible in **DevOps -> Logs**, not in the CLI output.
+
+1. **`python` does not exist in the runtime — use `python3`.**
+   `"command": "python server.py"` fails with
+   `exec failed: python server.py : No such file or directory (os error 2)`.
+
+2. **`requirements.txt` is NOT installed.** Deployments report Success with
+   `Deployment Logs: N/A` — there is no build step at all, so the app dies on
+   `ModuleNotFoundError: No module named 'uvicorn'`. Dependencies must be
+   vendored as linux `cp311` wheels. From the repo root, on any OS:
+
+   ```
+   pip install "fastapi==0.115.6" "uvicorn==0.34.0" "psycopg[binary]==3.2.3" \
+     "psycopg_pool==3.2.4" "httpx==0.28.1" "rapidfuzz==3.10.1" "pydantic==2.10.4" \
+     --target vendor --platform manylinux2014_x86_64 --python-version 3.11 \
+     --only-binary=:all: --implementation cp
+   ```
+
+   `server.py` prepends `vendor/` to `sys.path` before importing uvicorn.
+   `vendor/` is gitignored — regenerate it before deploying from a clean clone.
+
+3. **CLI login needs the India DC:** `catalyst login --dc in`. Without it the
+   CLI authenticates but `project:list` comes back empty.
+
+`app-config.json` (gitignored) carries `GEMINI_API_KEY`, `GEMINI_MODEL` and
+`DATABASE_URL`. Note the app uses **Gemini**, so do not set `ANTHROPIC_API_KEY`
+there — `app/llm/client.py` checks Anthropic first and would route to it.

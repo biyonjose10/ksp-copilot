@@ -461,19 +461,46 @@ Any of these will consume a day and win nothing.
 
 ---
 
-## 15. Current state & onboarding (updated 2026-07-24)
+## 15. Current state & onboarding (updated 2026-07-25)
 
 Repo is **public**: https://github.com/banitsriram/ksp-copilot — anyone can read/fork; push access is by collaborator invite (Biyon, Andrea, Rayan).
 
-**Secrets live outside git.** `.env` and `app-config.json` are `.gitignore`d and were never committed. They are shared privately (team chat), never in the repo:
-- `GEMINI_API_KEY` — the build uses **Google Gemini** (`gemini-2.5-flash`), not the Anthropic API named in §5. Router/synthesis prompts are unchanged; only the client differs.
-- `DATABASE_URL` — points at a **Neon** serverless Postgres (the demo DB, seeded from `db/seed.py`). Local dev can use the docker-compose Postgres instead.
+**Secrets live outside git.** `.env`, `app-config.json` and `.catalystrc` are `.gitignore`d and have never been committed — verified across full history. They are shared privately (team chat), never in the repo:
+- `GEMINI_API_KEY` — the build uses **Google Gemini** (`gemini-2.5-flash`), not the Anthropic API named in §5. Router/synthesis prompts are unchanged; only the client differs. Do **not** set `ANTHROPIC_API_KEY` in the deployed environment: `app/llm/client.py` checks Anthropic first and would route every query to a provider we do not use.
+- `DATABASE_URL` — points at a **Neon** serverless Postgres (the demo DB, seeded from `db/seed.py`). Local dev can use the docker-compose Postgres instead. Note seeding is row-by-row with `autocommit=True`, so over a long-haul connection it takes ~30 minutes.
+
+Rotate both credentials before the finale, and keep the deployed URL out of this repo and
+off any public surface — the app has no authentication by design (§14).
 
 **Local setup from a fresh clone:**
 ```
 docker compose up                              # postgres + api
-docker compose exec api python db/seed.py      # deterministic synthetic data (~6k FIRs)
+docker compose exec api python db/seed.py      # deterministic synthetic data (~5.9k FIRs)
 # create .env + app-config.json from the values shared privately
 ```
+Without Docker: create a venv on **Python 3.11 or 3.13** (the pinned dependencies have no
+3.14 wheels), `pip install -r requirements.txt`, then export `DATABASE_URL` and
+`GEMINI_API_KEY` **into the shell** — `app/config.py` reads `os.environ` directly and
+nothing loads `.env` outside docker-compose — and run `uvicorn app.main:app --reload`.
 
-**Deployment status:** Zoho Catalyst AppSail deploy is in progress (`server.py` + `catalyst.json` + local-only `app-config.json`); startup still being debugged against console logs. An ngrok static-domain tunnel over the local app is the standby demo URL.
+**Deployment status: deployed and verified on Zoho Catalyst AppSail.** Verified against the
+deployed URL, not locally: `/api/health` → `{"status":"ok","db":"up"}`; the UI is served by
+the same AppSail service (no separate hosting needed for `web/`); all five §1 demo questions
+answer correctly; the Q5 follow-up refuses; `pytest -q` passes. Answers were cross-checked
+against direct SQL rather than trusting the app.
+
+**Read `DEPLOY.md` before deploying.** Three non-obvious things break it, and all three
+surface as the *same* opaque `503 Execution failed. Please check the startup command or
+port.` while the CLI still reports "DEPLOYMENT SUCCESSFUL". The real error appears **only**
+in the Catalyst console under **DevOps → Logs** — start there, not in CLI output:
+1. `catalyst login --dc in` — without the flag, login succeeds but `project:list` is empty.
+2. The runtime has **no `python` binary**; the start command must use `python3`.
+3. Catalyst runs **no build step**, so `requirements.txt` is never installed. Dependencies
+   are vendored as linux `cp311` wheels in `vendor/`, which is gitignored and **must be
+   regenerated before deploying from a clean clone** (command in `DEPLOY.md`).
+
+The connection pool in `app/db.py` opening at import time looks like a startup-failure
+culprit and is **not** one. Do not "fix" it.
+
+An ngrok static-domain tunnel over the local app remains the standby demo URL (`DEPLOY.md`
+Path B).

@@ -4,6 +4,14 @@ Catalyst injects the port to bind via an env var and does not reliably shell-exp
 ${...} inside the configured start command, so we read the port in Python instead.
 """
 import os
+import sys
+
+# Catalyst's managed Python runtime does not install requirements.txt (deploys
+# report no build step), so third-party deps are vendored as linux cp311 wheels
+# under vendor/ and put on the path before any of them are imported.
+_vendor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
+if os.path.isdir(_vendor) and _vendor not in sys.path:
+    sys.path.insert(0, _vendor)
 
 import uvicorn
 

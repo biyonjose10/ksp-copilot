@@ -9,3 +9,6 @@ logs/*.jsonl
 # Catalyst deploy config — contains secrets, keep local
 app-config.json
 .catalystrc
+
+# Vendored linux wheels for Catalyst AppSail — regenerate, do not commit (44MB)
+vendor/

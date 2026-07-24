@@ -5,3 +5,7 @@ venv/
 .env
 logs/*.jsonl
 .pytest_cache/
+
+# Catalyst deploy config — contains secrets, keep local
+app-config.json
+.catalystrc

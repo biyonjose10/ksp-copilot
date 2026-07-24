@@ -1,0 +1,12 @@
+.venv/
+venv/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+logs/*.jsonl
+node_modules/
+.env
+*.jpeg
+*.png
